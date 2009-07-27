@@ -160,9 +160,6 @@ repos = [
     Repo( "flash430", "/boards/lib-fw/flash430" ),
     Repo( "msp430-types", "/boards/lib-fw/types" ),
 
-    Repo( "pyenv", "/boards/slug/pyenv" ),
-    # TODO: pyenv disttools + dummy
-
     Repo( "i2c-msd", "/boards/slug/i2c-msd" ),
     Repo( "c2py", "/boards/slug/c2py" ),
     Repo( "slug-outline", "/boards/slug/outline" ),
@@ -182,6 +179,11 @@ repos = [
     NSRepo( "userman", "/web/userman" ),
     NSRepo( "tools", "/tools" )
 ]
+
+r = Repo( "pyenv", "/boards/slug/pyenv" )
+r.layout["tags"] = "tag"
+repos += [r]
+# TODO: pyenv disttools + dummy
 
 r = Repo( "Robo-IDE", "/Robo-IDE" )
 r.layout["branch"] = "branches"
