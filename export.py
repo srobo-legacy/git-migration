@@ -1,11 +1,16 @@
 #!/usr/bin/env python
-import subprocess, os, hashlib, shutil
+import subprocess, os, hashlib
 
 GIT_SVN_PROP_FILTER = "%s/git-svn-props" % os.getcwd()
 CACHE_DIR = "%s/cache" % os.getcwd()
 
 def complete_url(path):
     return "http://svn.srobo.org%s" % path
+
+def copydir(src,dst):
+    p = subprocess.Popen( args = "cp -a %s %s" % (src,dst), shell = True )
+    p.communicate()
+    p.wait()
 
 class Repo:
     def __init__(self, name, path):
@@ -54,7 +59,7 @@ class Repo:
             os.mkdir( CACHE_DIR )
 
         print "Adding %s to cache" % self.name
-        shutil.copytree( self.name, "%s/%s" % ( CACHE_DIR, self._hash() ) )
+        copydir( self.name, "%s/%s" % ( CACHE_DIR, self._hash() ) )
 
     def __repr__(self):
         s = """Repo( name = '%s',
@@ -71,8 +76,8 @@ class Repo:
         if not d:
             self._svn_clone()
         else:
-            print "Using cached git-svn clone"
-            shutil.copytree( d, self.name )
+            print "Using cached git-svn clone of", self.name
+            copydir( d, self.name )
 
         self._sort_tags()
         self._sort_branches()
