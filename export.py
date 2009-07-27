@@ -129,6 +129,9 @@ class Repo:
         # git branch $x $x
         l = self._branch_list()
         for branch in l:
+            if branch == "git-svn":
+                pass
+
             p = subprocess.Popen( args = "git branch %s %s" % ( branch, branch ),
                                   shell = True, cwd = self.name )
             p.communicate()
@@ -151,6 +154,9 @@ class Repo:
         branches = self._branch_list()
         if "trunk" in branches:
             branches.remove("trunk")
+        if "git-svn" in branches:
+            branches.remove("git-svn")
+
         f = ["heads/master"] + self._tag_list() + [ "heads/" + x for x in branches ]
         f = " ".join(f)
 
