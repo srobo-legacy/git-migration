@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import subprocess, os
+import subprocess, os, hashlib, shutil
 
 GIT_SVN_PROP_FILTER = "%s/git-svn-props" % os.getcwd()
+CACHE_DIR = "%s/cache" % os.getcwd()
 
 def complete_url(path):
     return "http://svn.srobo.org%s" % path
@@ -12,23 +13,28 @@ class Repo:
         self.stdlayout = True
         self.name = name
         self.path = path
-        self.tags = []
         self.layout = { "trunk": "trunk",
                         "branch": "branch",
                         "tags": "tags" }
         self.git_dir = "./git/%s" % name
 
+    def _hash(self):
+        h = hashlib.sha1()
+        h.update( self.__repr__() )
+        return h.hexdigest()
 
-    def __repr__(self):
-        s = """Repo( name = '%s',
-      path = '%s',
-      stdlayout = %s,
-      layout = %s )""" % ( self.name, self.path, 
-                           str(self.stdlayout), 
-                           str(self.layout) )
-        return s
+    def _try_from_cache(self):
+        """Check the cache of repos to see if we've already git-svn cloned it before"""
+        print self._hash()
+        if not os.path.exists( CACHE_DIR ):
+            return False
+        
+        if os.path.exists( "%s/%s" % ( CACHE_DIR, self._hash() ) ):
+            return "%s/%s" % ( CACHE_DIR, self._hash() )
+        else:
+            return False
 
-    def process(self):
+    def _svn_clone(self):
         #git svn clone $SVN_DIR${1} -T trunk -t tags -b branches $2 
         layout = ""
         if self.stdlayout:
@@ -42,6 +48,31 @@ class Repo:
                               shell = True )
         p.communicate()
         p.wait()
+
+        # Add clone to cache
+        if not os.path.exists( CACHE_DIR ):
+            os.mkdir( CACHE_DIR )
+
+        print "Adding %s to cache" % self.name
+        shutil.copytree( self.name, "%s/%s" % ( CACHE_DIR, self._hash() ) )
+
+    def __repr__(self):
+        s = """Repo( name = '%s',
+      path = '%s',
+      stdlayout = %s,
+      layout = %s )""" % ( self.name, self.path, 
+                           str(self.stdlayout), 
+                           str(self.layout) )
+        return s
+
+    def process(self):
+
+        d = self._try_from_cache()
+        if not d:
+            self._svn_clone()
+        else:
+            print "Using cached git-svn clone"
+            shutil.copytree( d, self.name )
 
         self._sort_tags()
         self._sort_branches()
@@ -98,9 +129,16 @@ class Repo:
             p.wait()
 
     def _filter_props(self):
+        # Git status cleans up repository state
+        p = subprocess.Popen( args = "git status", cwd = self.name, shell = True )
+        p.communicate()
+        p.wait()
+
         # We need to filter all commits that are reachable from all tags and branches
         f = ["heads/master"] + self._tag_list() + [ "heads/" + x for x in self._branch_list() ]
         f = " ".join(f)
+
+        os.putenv( "PATH", "%s:%s" % ( os.getenv("PATH"), os.path.join( os.getcwd(), "../" ) ) )
 
         p = subprocess.Popen( args = "git filter-branch --tree-filter %s %s" % ( GIT_SVN_PROP_FILTER, f ) ,
                               shell = True,
@@ -164,10 +202,11 @@ for board in [ "motor", "jointio", "pwm", "power" ]:
 
     repos += [ fw, pcb, outline, test_util ]
 
-os.mkdir( "git" )
-os.mkdir( "tmp" )
-os.chdir( "tmp" )
+if __name__ == "__main__":
+    os.mkdir( "git" )
+    os.mkdir( "tmp" )
+    os.chdir( "tmp" )
 
-for r in repos:
-    r.process()
+    for r in repos:
+        r.process()
 

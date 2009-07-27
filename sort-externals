@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+import subprocess
+
+def find_rev():
+    p = subprocess.Popen( args = "git svn find-rev HEAD",
+                          shell = True,
+                          stdout = subprocess.PIPE )
+    r = p.communicate()
+    p.wait()
+
+    return int(r[0])
+
+p = subprocess.Popen( args = "git svn show-externals",
+                      stdout = subprocess.PIPE,
+                      shell = True )
+
+r = p.communicate()
+p.wait()
+
+for l in r[0].splitlines():
+    if len(l) == 0 or l[0] == '#':
+        continue
+
+    v = l.split()
+    if len(v) == 3:
+        path, rev, url = v
+    else:
+        path, url = v
+        rev = find_rev()
+
+    # Now we know what subversion reference we want,
+    # we need to find out what commit hash to reference in
+    # the repository.  We also need to know what repository to
+    # reference.
+
+    f = open( "EXTERNALS", "a+" )
+    f.write( "%s, %s, %s\n" % ( path, str(rev), url ) )
+    f.close()
