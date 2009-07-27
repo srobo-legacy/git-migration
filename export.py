@@ -135,7 +135,8 @@ class Repo:
             p.wait()
 
         if "trunk" in l:
-            p = subprocess.Popen( args = "git checkout -b export_tmp; git branch -f master remotes/trunk; git checkout master; git branch -D export_tmp",
+            # Point master at trunk, and then delete trunk
+            p = subprocess.Popen( args = "git checkout -b export_tmp; git branch -f master remotes/trunk; git checkout master; git branch -D export_tmp; git branch -D trunk",
                                   shell = True, cwd = self.name )
             p.communicate()
             p.wait()
@@ -147,7 +148,10 @@ class Repo:
         p.wait()
 
         # We need to filter all commits that are reachable from all tags and branches
-        f = ["heads/master"] + self._tag_list() + [ "heads/" + x for x in self._branch_list() ]
+        branches = self._branch_list()
+        if "trunk" in branches:
+            branches.remove("trunk")
+        f = ["heads/master"] + self._tag_list() + [ "heads/" + x for x in branches ]
         f = " ".join(f)
 
         os.putenv( "PATH", "%s:%s" % ( os.getenv("PATH"), os.path.join( os.getcwd(), "../" ) ) )
