@@ -152,7 +152,7 @@ class Repo:
 
         os.putenv( "PATH", "%s:%s" % ( os.getenv("PATH"), os.path.join( os.getcwd(), "../" ) ) )
 
-        p = subprocess.Popen( args = "git filter-branch --tree-filter %s %s" % ( GIT_SVN_PROP_FILTER, f ) ,
+        p = subprocess.Popen( args = """git filter-branch --prune-empty --tree-filter %s %s""" % ( GIT_SVN_PROP_FILTER, f ) ,
                               shell = True,
                               cwd = self.name )
         p.communicate()
