@@ -113,7 +113,7 @@ class Repo:
         p.wait()
 
         for branch in r[0].split():
-            if '@' not in branch and branch != "trunk":
+            if '@' not in branch:
                 branches.append( branch )
         return branches
 
@@ -127,8 +127,15 @@ class Repo:
 
     def _sort_branches(self):
         # git branch $x $x
-        for branch in self._branch_list():
+        l = self._branch_list()
+        for branch in l:
             p = subprocess.Popen( args = "git branch %s %s" % ( branch, branch ),
+                                  shell = True, cwd = self.name )
+            p.communicate()
+            p.wait()
+
+        if "trunk" in l:
+            p = subprocess.Popen( args = "git checkout -b export_tmp; git branch -f master remotes/trunk; git checkout master; git branch -D export_tmp",
                                   shell = True, cwd = self.name )
             p.communicate()
             p.wait()
