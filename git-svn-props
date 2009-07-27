@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# invoke with: git filter-branch --tree-filter ~/git-svn-props HEAD
+
+git svn create-ignore
+# strip leading forward slashes off:
+find -name '.gitignore' | while read f
+do
+    sed -i -e 's#^/##' $f 
+done
+
+#git svn show-externals
+
