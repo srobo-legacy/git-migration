@@ -227,8 +227,11 @@ for board in [ "motor", "jointio", "pwm", "power" ]:
     repos += [ fw, pcb, outline, test_util ]
 
 # Add the docs
-for doc in [ "4p4c", "assembly-guide", "jointio", "motor", "power", "prog-ref", "pwm", "slug" ]:
+for doc in [ "4p4c", "jointio", "motor", "power", "pwm", "slug" ]:
     repos += [ NSRepo( "%s-docs" % doc, "/docs/%s" % doc ) ]
+
+repos += [ NSRepo( "assembly-guide", "/docs/assembly-guide" ),
+           NSRepo( "prog-ref", "/docs/prog-ref" ) ]
 
 if __name__ == "__main__":
     os.mkdir( "git" )
