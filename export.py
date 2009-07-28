@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import subprocess, os, hashlib
+import subprocess, os, hashlib, re
 
 GIT_SVN_PROP_FILTER = "%s/git-svn-props" % os.getcwd()
 CACHE_DIR = "%s/cache" % os.getcwd()
@@ -50,9 +50,21 @@ class Repo:
         p = subprocess.Popen( args = "git svn clone %s %s %s" % ( layout,
                                                                   complete_url( self.path ),
                                                                   self.name ),
+                              stdout = subprocess.PIPE,
                               shell = True )
-        p.communicate()
+        r = p.communicate()
         p.wait()
+
+        fd = open( "%s/.git/svn_rev_map" % self.name, "w" )
+        reg = re.compile( 'r([0-9]+) = ([^)]+) \(([^)]+)\)' )
+        for l in r[0].splitlines():
+            m = reg.match(l)
+            if m == None:
+                continue
+            rev, sha1, branch = m.groups()
+
+            fd.write( "%s %s %s %s %s\n" % ( self.path, self.name, rev, sha1, branch ) )
+        fd.close()
 
         # Add clone to cache
         if not os.path.exists( CACHE_DIR ):
