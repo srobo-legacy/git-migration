@@ -136,6 +136,7 @@ p.wait()
 
 newsub = not os.path.exists(".gitmodules")
 gitmodules = None
+cur_base_hash = os.getenv( "GIT_COMMIT" )
 
 for l in r[0].splitlines():
     # Ignore externals lines that begin with #
@@ -175,11 +176,11 @@ for l in r[0].splitlines():
     print
     print
 
-    treeobj = mangle_git_tree( os.getenv("GIT_COMMIT"), exthash, path )
+    cur_base_hash = mangle_git_tree( cur_base_hash, exthash, path )
 
     # Read the tree object into the index 
     print "Reading tree into index."
-    subprocess.Popen( args = "git read-tree %s" % treeobj, shell = True ).wait()
+    subprocess.Popen( args = "git read-tree %s" % cur_base_hash, shell = True ).wait()
     print "Checking out new tree."
     subprocess.Popen( args = "git checkout-index %s" % path, shell = True ).wait()    
 
