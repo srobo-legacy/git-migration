@@ -103,10 +103,10 @@ def mangle_git_tree( basehash, exthash, path ):
     p = subprocess.Popen( args = "cat %s | git mktree --missing" % treefname,
                           shell = True,
                           stdout = subprocess.PIPE )
-    os.remove(treefname)
-
     treeobj = p.communicate()[0].strip()
     p.wait()
+    os.remove(treefname)
+
     print "Created tree object %s" % treeobj
     return treeobj
 
