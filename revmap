@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+import git, os, externals
+
+URL_PREFIX = "https://www.studentrobotics.org/svn"
+
+def allcommit_gen(repo, start):
+    "Generator for all commits from the given repository"
+    PAGE = 100
+    skip = 0
+
+    while 1:
+        c = repo.commits( start = start,
+                          max_count = PAGE,
+                          skip = skip )
+
+        if len(c) == 0:
+            return
+
+        for commit in c:
+            yield commit
+
+        skip += PAGE
+
+def extract_svn_revpath(commit):
+    msg = commit.message
+
+    svn_line = msg[ msg.rfind("\n"): ].strip()
+    assert "git-svn-id: " in svn_line
+
+    url = svn_line.split()[1]
+    path = url[len(URL_PREFIX):]
+
+    rev = int(path[ path.find("@")+1: ])
+    path = path[:path.find("@")]
+
+    return (path, rev)
+
+os.chdir( "externals" )
+
+mapf = open("gitsvn-revmap", "w")
+
+for r in externals.repos:
+    if not r.exists:
+        continue
+
+    repo = git.Repo( r.path )
+
+    heads = []
+    heads += repo.branches
+    heads += repo.tags
+    
+    for head in heads:
+        hname = head.name
+
+        for commit in allcommit_gen(repo, hname):
+            path, rev = extract_svn_revpath(commit)
+            lpath = path[len(r.svn_path):]
+
+            if lpath == "":
+                lpath = "/"
+
+            mapf.write( "%s %s %s %s\n" % (r.path, lpath, rev, commit.id) )
+
