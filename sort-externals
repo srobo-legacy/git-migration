@@ -18,7 +18,11 @@ def remove_prefix(url):
 def extract_svn_revpath(commit):
     msg = commit.message
 
-    svn_line = msg[ msg.rfind("\n"): ].strip()
+    for l in msg.splitlines():
+        if "git-svn-id:" in l:
+            break
+
+    svn_line = l.strip()
     assert "git-svn-id: " in svn_line
 
     url = svn_line.split()[1]
@@ -52,6 +56,7 @@ def translate_repo(url):
 
 def find_relative_loc(otherrepo):
     # WARNING: HARD-CODED
+    print "WARNING: HARD CODED VALUE"
     mydir = "userman.git"
 
     my = mydir.count("/")
@@ -61,9 +66,11 @@ def find_relative_loc(otherrepo):
     return loc
 
 def mangle_git_tree( basehash, exthash, path ):
+    print "mangle_git_tree( basehash = '%s', exthash = '%s', path = '%s' )" % ( basehash, exthash, path )
     # Here lies git fu.
-    # We don't currently support externals in subdirectories
-    assert "/" not in path
+    if isinstance( path, str ):
+        path = [x for x in path.split("/") if x !=  ""]
+
     tmpfd, treefname = tempfile.mkstemp()
     treef = os.fdopen(tmpfd, "w")
 
@@ -74,20 +81,28 @@ def mangle_git_tree( basehash, exthash, path ):
     r = p.communicate()
     p.wait()
 
+    treeline = None
+    if len(path) == 1:
+        treeline = "160000 commit %s\t%s\n" % (exthash, path[0])
+
     for entry in r[0].splitlines():
         objperm, objtype, objhash, objname = entry.split()
 
-        if objtype == "commit" and objname == path:
-            "Ignore our tree line, it'll be written in a mo"
-            continue
+        if objname == path[0]:
+            "It's our tree line"
 
-        if objtype == "tree" and objname == path:
-            "Ignore a directory with the same name as our external"
+            if len(path) > 1:
+                "We're a tree!"
+                thash = mangle_git_tree( objhash, exthash, path[1:] )
+                treeline = "040000 tree %s\t%s\n" % ( thash, path[0] )
+
+            # Our line will be written after the loop
             continue
 
         treef.write( "%s\n" % entry )
 
-    treeline = "160000 commit %s\t%s\n" % ( exthash, path )
+    assert treeline != None
+
     treef.write( treeline )
     treef.close()
 
