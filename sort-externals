@@ -60,16 +60,15 @@ def find_relative_loc(otherrepo):
     print "Location:", loc
     return loc
 
-def mangle_git_tree( exthash, path ):
+def mangle_git_tree( basehash, exthash, path ):
     # Here lies git fu.
     # We don't currently support externals in subdirectories
     assert "/" not in path
     tmpfd, treefname = tempfile.mkstemp()
     treef = os.fdopen(tmpfd, "w")
 
-    # Poke around in the current tree to see if there's an entry we need to edit
-    h = os.getenv( "GIT_COMMIT" )
-    p = subprocess.Popen( args = "git ls-tree %s" % h,
+    # Get the current tree
+    p = subprocess.Popen( args = "git ls-tree %s" % basehash,
                           stdout = subprocess.PIPE,
                           shell = True )
     r = p.communicate()
@@ -93,7 +92,7 @@ def mangle_git_tree( exthash, path ):
     treef.close()
 
     print "Tree before:\n"
-    subprocess.Popen( args = "git ls-tree %s" % h, shell = True ).wait()
+    subprocess.Popen( args = "git ls-tree %s" % basehash, shell = True ).wait()
     print
     print "Tree after:\n"
     subprocess.Popen( args = "cat %s" % treefname, shell = True ).wait()
@@ -161,7 +160,7 @@ for l in r[0].splitlines():
     print
     print
 
-    treeobj = mangle_git_tree( exthash, path )
+    treeobj = mangle_git_tree( os.getenv("GIT_COMMIT"), exthash, path )
 
     # Read the tree object into the index 
     print "Reading tree into index."
