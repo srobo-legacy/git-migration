@@ -60,6 +60,59 @@ def find_relative_loc(otherrepo):
     print "Location:", loc
     return loc
 
+def mangle_git_tree( exthash, path ):
+    # Here lies git fu.
+    # We don't currently support externals in subdirectories
+    assert "/" not in path
+    tmpfd, treefname = tempfile.mkstemp()
+    treef = os.fdopen(tmpfd, "w")
+
+    # Poke around in the current tree to see if there's an entry we need to edit
+    h = os.getenv( "GIT_COMMIT" )
+    p = subprocess.Popen( args = "git ls-tree %s" % h,
+                          stdout = subprocess.PIPE,
+                          shell = True )
+    r = p.communicate()
+    p.wait()
+
+    for entry in r[0].splitlines():
+        objperm, objtype, objhash, objname = entry.split()
+
+        if objtype == "commit" and objname == path:
+            "Ignore our tree line, it'll be written in a mo"
+            continue
+
+        if objtype == "tree" and objname == path:
+            "Ignore a directory with the same name as our external"
+            continue
+
+        treef.write( "%s\n" % entry )
+
+    treeline = "160000 commit %s\t%s\n" % ( exthash, path )
+    treef.write( treeline )
+    treef.close()
+
+    print "Tree before:\n"
+    subprocess.Popen( args = "git ls-tree %s" % h, shell = True ).wait()
+    print
+    print "Tree after:\n"
+    subprocess.Popen( args = "cat %s" % treefname, shell = True ).wait()
+    print
+
+    # Make a tree object:
+    print "Making new tree."
+    p = subprocess.Popen( args = "cat %s | git mktree --missing" % treefname,
+                          shell = True,
+                          stdout = subprocess.PIPE )
+    os.remove(treefname)
+
+    treeobj = p.communicate()[0].strip()
+    p.wait()
+    print "Created tree object %s" % treeobj
+    return treeobj
+
+
+
 p = subprocess.Popen( args = "git svn show-externals",
                       stdout = subprocess.PIPE,
                       shell = True )
@@ -108,61 +161,7 @@ for l in r[0].splitlines():
     print
     print
 
-    # Here lies git fu.
-
-    psplit = path.split("/")
-    
-    
-
-    # We don't currently support externals in subdirectories
-    assert "/" not in path
-
-    tmpfd, treefname = tempfile.mkstemp()
-    treef = os.fdopen(tmpfd, "w")
-
-
-    # Poke around in the current tree to see if there's an entry we need to edit
-    h = os.getenv( "GIT_COMMIT" )
-    p = subprocess.Popen( args = "git ls-tree %s" % h, 
-                          stdout = subprocess.PIPE,
-                          shell = True )
-    r = p.communicate()
-    p.wait()
-
-    for entry in r[0].splitlines():
-        objperm, objtype, objhash, objname = entry.split()
-
-        if objtype == "commit" and objname == path:
-            "Ignore our tree line, it'll be written in a mo"
-            continue
-
-        if objtype == "tree" and objname == path:
-            "Ignore a directory with the same name as our external"
-            continue
-
-        treef.write( "%s\n" % entry )
-            
-    treeline = "160000 commit %s\t%s\n" % ( exthash, path )
-    treef.write( treeline )
-    treef.close()
-
-    print
-    print
-    subprocess.Popen( args = "git ls-tree %s" % h, shell = True ).wait()
-    print
-    print
-    subprocess.Popen( args = "cat %s" % treefname, shell = True ).wait()
-    print
-    print
-
-    # Make a tree object:
-    print "Making new tree."
-    p = subprocess.Popen( args = "cat %s | git mktree --missing" % treefname,
-                          shell = True,
-                          stdout = subprocess.PIPE )
-    treeobj = p.communicate()[0].strip()
-    p.wait()
-    print "Created tree object %s" % treeobj
+    treeobj = mangle_git_tree( exthash, path )
 
     # Read the tree object into the index 
     print "Reading tree into index."
