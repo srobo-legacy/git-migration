@@ -68,12 +68,15 @@ r = p.communicate()
 p.wait()
 
 newsub = not os.path.exists(".gitmodules")
-gitmodules = open(".gitmodules", "w")
+gitmodules = None
 
 for l in r[0].splitlines():
     # Ignore externals lines that begin with #
     if len(l) == 0 or l[0] == '#':
         continue
+
+    if gitmodules == None:
+        gitmodules = open(".gitmodules", "w")
 
     print
     print "External:", l
