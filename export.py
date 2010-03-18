@@ -83,6 +83,7 @@ class Repo:
         return s
 
     def process(self):
+        print "Processing %s:" % self.name
 
         d = self._try_from_cache()
         if not d:
@@ -112,6 +113,7 @@ class Repo:
         for tag in r[0].split():
             name = tag.split('/')[1]
             if '@' not in name:
+                print "Adding tag %s" % name
                 tags.append( name )
 
         return tags
@@ -126,6 +128,7 @@ class Repo:
 
         for branch in r[0].split():
             if '@' not in branch:
+                print "Adding branch %s" % branch
                 branches.append( branch )
         return branches
 
@@ -157,6 +160,7 @@ class Repo:
             p.wait()
 
     def _filter_props(self):
+        "Deal with svn:ignore and svn:externals"
         # Git status cleans up repository state
         p = subprocess.Popen( args = "git status", cwd = self.name, shell = True )
         p.communicate()
