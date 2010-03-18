@@ -47,9 +47,9 @@ class Repo:
                                              self.layout["tags"],
                                              self.layout["branch"] )
 
-        p = subprocess.Popen( args = "git svn clone %s %s %s" % ( layout,
-                                                                  complete_url( self.path ),
-                                                                  self.name ),
+        p = subprocess.Popen( args = "git svn --authors-file=../usermap clone %s %s %s" % ( layout,
+                                                                                            complete_url( self.path ),
+                                                                                            self.name ),
                               stdout = subprocess.PIPE,
                               shell = True )
         r = p.communicate()
