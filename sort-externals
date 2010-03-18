@@ -1,14 +1,64 @@
 #!/usr/bin/env python
-import subprocess
+import subprocess, git, os, externals, tempfile
+
+URL_PREFIXES = [ "http://www.studentrobotics.org/svn",
+                 "http://svn.studentrobotics.org",
+                 "https://www.studentrobotics.org/svn",
+                 "file:///home/rob/sr/dev/git-migration/svn" ]
+
+def remove_prefix(url):
+    for p in URL_PREFIXES:
+        if url[:len(p)] == p:
+            prefix = p
+            break
+
+    url = url[len(prefix):]
+    return url
+
+def extract_svn_revpath(commit):
+    msg = commit.message
+
+    svn_line = msg[ msg.rfind("\n"): ].strip()
+    assert "git-svn-id: " in svn_line
+
+    url = svn_line.split()[1]
+
+    path = remove_prefix(url)
+
+    rev = int(path[ path.find("@")+1: ])
+    path = path[:path.find("@")]
+
+    return (path, rev)
 
 def find_rev():
-    p = subprocess.Popen( args = "git svn find-rev HEAD",
-                          shell = True,
-                          stdout = subprocess.PIPE )
-    r = p.communicate()
-    p.wait()
+    repo = git.Repo("./")
+    chash = os.getenv( "GIT_COMMIT" )
+    commit = repo.commit( chash )
+    path, rev = extract_svn_revpath(commit)
 
-    return int(r[0])
+    return rev
+
+def translate_repo(url):
+    "Translate the given subversion URL into a git repo"
+    path = remove_prefix(url)
+    
+    for repo in externals.repos:
+        if repo.svn_path == path[:len(repo.svn_path)]:
+            p = path[len(repo.svn_path):]
+            if p == "":
+                p = "/"
+            return (repo.path, p)
+    assert False
+
+def find_relative_loc(otherrepo):
+    # WARNING: HARD-CODED
+    mydir = "userman.git"
+
+    my = mydir.count("/")
+    #oy = otherrepo.count("/")
+    loc = "../" * (my+1) + otherrepo
+    print "Location:", loc
+    return loc
 
 p = subprocess.Popen( args = "git svn show-externals",
                       stdout = subprocess.PIPE,
@@ -17,22 +67,113 @@ p = subprocess.Popen( args = "git svn show-externals",
 r = p.communicate()
 p.wait()
 
+newsub = not os.path.exists(".gitmodules")
+gitmodules = open(".gitmodules", "w")
+
 for l in r[0].splitlines():
+    # Ignore externals lines that begin with #
     if len(l) == 0 or l[0] == '#':
         continue
 
+    print
+    print "External:", l
+
     v = l.split()
-    if len(v) == 3:
-        path, rev, url = v
-    else:
-        path, url = v
-        rev = find_rev()
+    # We don't actually support specified revisions right now :-P
+    assert len(v) == 2
 
-    # Now we know what subversion reference we want,
-    # we need to find out what commit hash to reference in
-    # the repository.  We also need to know what repository to
-    # reference.
+    path, url = v
+    rev = find_rev()
 
-    f = open( "EXTERNALS", "a+" )
-    f.write( "%s, %s, %s\n" % ( path, str(rev), url ) )
-    f.close()
+    if path[0] == "/":
+        path = path[1:]
+
+    reponame, repopath = translate_repo( url )
+
+    # rev: The current subversion revision
+    # path: The path that the external is checked out into
+    # reponame: The external git repository (e.g. srusers.git)
+    # repopath: The path within the original subversion external (e.g. /tags/v0.01)
+
+    print "rev:", rev
+    print "path:", path
+    print "repopath:", repopath
+
+    exthash = externals.find_chash( reponame, repopath, rev )
+    print "hash:", exthash
+
+    print
+    print
+
+    # Here lies git fu.
+
+    psplit = path.split("/")
+    
+    
+
+    # We don't currently support externals in subdirectories
+    assert "/" not in path
+
+    tmpfd, treefname = tempfile.mkstemp()
+    treef = os.fdopen(tmpfd, "w")
+
+
+    # Poke around in the current tree to see if there's an entry we need to edit
+    h = os.getenv( "GIT_COMMIT" )
+    p = subprocess.Popen( args = "git ls-tree %s" % h, 
+                          stdout = subprocess.PIPE,
+                          shell = True )
+    r = p.communicate()
+    p.wait()
+
+    for entry in r[0].splitlines():
+        objperm, objtype, objhash, objname = entry.split()
+
+        if objtype == "commit" and objname == path:
+            "Ignore our tree line, it'll be written in a mo"
+            continue
+
+        if objtype == "tree" and objname == path:
+            "Ignore a directory with the same name as our external"
+            continue
+
+        treef.write( "%s\n" % entry )
+            
+    treeline = "160000 commit %s\t%s\n" % ( exthash, path )
+    treef.write( treeline )
+    treef.close()
+
+    print
+    print
+    subprocess.Popen( args = "git ls-tree %s" % h, shell = True ).wait()
+    print
+    print
+    subprocess.Popen( args = "cat %s" % treefname, shell = True ).wait()
+    print
+    print
+
+    # Make a tree object:
+    print "Making new tree."
+    p = subprocess.Popen( args = "cat %s | git mktree --missing" % treefname,
+                          shell = True,
+                          stdout = subprocess.PIPE )
+    treeobj = p.communicate()[0].strip()
+    p.wait()
+    print "Created tree object %s" % treeobj
+
+    # Read the tree object into the index 
+    print "Reading tree into index."
+    subprocess.Popen( args = "git read-tree %s" % treeobj, shell = True ).wait()
+    print "Checking out new tree."
+    subprocess.Popen( args = "git checkout-index %s" % path, shell = True ).wait()    
+
+    # Add to the gitmodules file:
+    gitmodules.write( """[submodule "%s"]
+	path = %s
+	url = %s
+""" % ( path, path, find_relative_loc(reponame) ) )
+
+print
+print
+print
+print
